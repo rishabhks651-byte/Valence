@@ -32,3 +32,14 @@ Valence is designed with lightweight simplicity in mind:
 ```bash
 git clone https://github.com/rishabhks651-byte/Valence.git
 cd Valence
+```
+
+### 2. Run Valence
+```bash
+python app.py
+```
+
+### 3. Open your browser and go to
+```bash
+localhost:3000
+```
