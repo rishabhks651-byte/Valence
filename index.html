@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Valence | Web Network Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0d0d12; color: #e4e4e7; }
+        .accent-border { border-color: #8a2be2; }
+        .accent-bg { background-color: #8a2be2; }
+        .accent-text { color: #a855f7; }
+    </style>
+</head>
+<body class="font-sans min-h-screen flex flex-col">
+
+    <header class="border-b border-zinc-800 bg-zinc-950/50 backdrop-blur px-8 py-4 flex items-center justify-between">
+        <h1 class="text-2xl font-black tracking-wider accent-text">VALENCE</h1>
+        <div id="system-info" class="text-xs text-zinc-400 text-right">
+            Loading interface specs...
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <div class="space-y-6 lg:col-span-1">
+            <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-xl shadow-xl">
+                <h2 class="text-lg font-bold mb-4">Discovery Control</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-zinc-400 mb-2">Target Subnet Range</label>
+                        <input id="subnet-input" type="text" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none focus:border-purple-500" value="192.168.1.0/24">
+                    </div>
+                    <button id="scan-btn" onclick="runNetworkScan()" class="w-full accent-bg hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition">
+                        ⚡ Scan Network
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-xl shadow-xl">
+                <h2 class="text-lg font-bold mb-4">Port Scanner</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-zinc-400 mb-1">Selected Host IP</label>
+                        <input id="port-ip" type="text" placeholder="Click a device in table..." class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none" readonly>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-zinc-400 mb-1">Target Ports</label>
+                        <input id="port-range" type="text" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm focus:outline-none" value="21, 22, 80, 443, 8080">
+                    </div>
+                    <button id="port-btn" onclick="runPortScan()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition" disabled>
+                        🔬 Start Port Scan
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-xl">
+                <div class="p-4 bg-zinc-950/80 border-b border-zinc-800 flex justify-between items-center">
+                    <h2 class="font-bold">Discovered Devices</h2>
+                    <span id="scan-status" class="text-xs text-zinc-500">Ready to Scan</span>
+                </div>
+                <div class="overflow-x-auto max-h-96">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-zinc-950/40 text-xs text-zinc-400 uppercase border-b border-zinc-800">
+                                <th class="p-4">Status</th>
+                                <th class="p-4">IP Address</th>
+                                <th class="p-4">MAC Address</th>
+                                <th class="p-4">Hostname</th>
+                            </tr>
+                        </thead>
+                        <tbody id="device-table" class="divide-y divide-zinc-800/50 text-sm">
+                            <tr>
+                                <td colspan="4" class="p-8 text-center text-zinc-500">No scan executed yet. Press "Scan Network" on the left.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-zinc-950 border border-zinc-800 rounded-xl p-4 shadow-xl">
+                <h3 class="text-xs font-bold uppercase text-zinc-500 mb-2">System Port Scan Output</h3>
+                <pre id="terminal-log" class="text-xs text-green-400 font-mono bg-zinc-900/50 p-4 rounded-lg h-32 overflow-y-auto">Terminal idle. Waiting for instruction...</pre>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Initial Startup Data
+        async function loadSystemDetails() {
+            try {
+                const response = await fetch('/api/info');
+                const data = await response.json();
+                document.getElementById('subnet-input').value = data.subnet;
+                document.getElementById('system-info').innerHTML = `IP: ${data.local_ip} | Host: ${data.hostname}<br>OS: ${data.platform}`;
+            } catch (err) {
+                console.error("Could not reach APIs", err);
+            }
+        }
+
+        // Active IP Network Scan
+        async function runNetworkScan() {
+            const btn = document.getElementById('scan-btn');
+            const subnet = document.getElementById('subnet-input').value;
+            const statusText = document.getElementById('scan-status');
+            const tbody = document.getElementById('device-table');
+
+            btn.disabled = true;
+            btn.innerText = "Scanning Subnet...";
+            statusText.innerText = "Sweeping Network...";
+            tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-zinc-400 animate-pulse">Running live network ping sweeps, please wait...</td></tr>`;
+
+            try {
+                const res = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subnet })
+                });
+                const data = await res.json();
+                
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                if(data.devices.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-zinc-500">No active devices found in range. Check CIDR configurations.</td></tr>`;
+                } else {
+                    data.devices.forEach(dev => {
+                        const row = document.createElement('tr');
+                        row.className = "hover:bg-zinc-800/40 cursor-pointer transition";
+                        row.onclick = () => selectDevice(dev.ip);
+                        row.innerHTML = `
+                            <td class="p-4 text-center">${dev.status}</td>
+                            <td class="p-4 font-semibold text-white">${dev.ip}</td>
+                            <td class="p-4 text-zinc-400">${dev.mac}</td>
+                            <td class="p-4 text-zinc-400">${dev.hostname}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                }
+                statusText.innerText = `Scan Finished! Identified ${data.devices.length} hosts.`;
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-red-500">Execution failed. Run command as Administrator/Sudo if using scapy.</td></tr>`;
+                statusText.innerText = "Scan Failure";
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "⚡ Scan Network";
+            }
+        }
+
+        function selectDevice(ip) {
+            document.getElementById('port-ip').value = ip;
+            const pBtn = document.getElementById('port-btn');
+            pBtn.removeAttribute('disabled');
+        }
+
+        // Target Port Scan
+        async function runPortScan() {
+            const ip = document.getElementById('port-ip').value;
+            const ports = document.getElementById('port-range').value;
+            const term = document.getElementById('terminal-log');
+            const btn = document.getElementById('port-btn');
+
+            if(!ip) return;
+            btn.disabled = true;
+            btn.innerText = "Searching Ports...";
+            term.innerText = `Initializing socket scanner for Target IP: ${ip}...\nScanning...\n`;
+
+            try {
+                const res = await fetch('/api/scan-ports', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip, ports })
+                });
+                const data = await res.json();
+
+                if (data.open_ports.length > 0) {
+                    term.innerText = `--- PORT SCAN SUMMARY FOR ${ip} ---\n` + 
+                                     `🟢 OPEN PORT(S) IDENTIFIED: ${data.open_ports.join(', ')}\n\n` + 
+                                     `Processed ${data.scanned_ports.length} ports.`;
+                } else {
+                    term.innerText = `--- PORT SCAN SUMMARY FOR ${ip} ---\n` +
+                                     `🔴 No ports identified as open within the evaluated range.\n\n` +
+                                     `Processed ${data.scanned_ports.length} ports.`;
+                }
+            } catch (err) {
+                term.innerText = `Error: Scan failed. Verify connection status to host ${ip}.`;
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "🔬 Start Port Scan";
+            }
+        }
+
+        // On window startup
+        window.onload = loadSystemDetails;
+    </script>
+</body>
+</html>
