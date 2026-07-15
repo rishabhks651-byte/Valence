@@ -34,12 +34,17 @@ git clone https://github.com/rishabhks651-byte/Valence.git
 cd Valence
 ```
 
-### 2. Run Valence
+### 2. Install requirements
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Run Valence
 ```bash
 python app.py
 ```
 
-### 3. Open your browser and go to
+### 4. Open your browser and go to
 ```bash
 localhost:3000
 ```
